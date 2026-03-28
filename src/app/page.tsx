@@ -11,6 +11,13 @@ type Scenario = {
   mode_share_walkbike: number;
 };
 
+type DataSourceRow = {
+  source: string;
+  coverage: string;
+  variables: string;
+  role: string;
+};
+
 const scenarios: Scenario[] = [
   { scenario_id: "V1+P1", co2e_total_kg: 14790.73, cost_total_usd: 198000, avg_travel_time_min: 49.22, landfill_kg: 1141.08, water_stress_adjusted_l: 40353.6, mode_share_car: 0.3529, mode_share_transit: 0.3722, mode_share_shuttle: 0.1254, mode_share_walkbike: 0.1495 },
   { scenario_id: "V1+P2", co2e_total_kg: 12148.72, cost_total_usd: 227400, avg_travel_time_min: 42.05, landfill_kg: 379.53, water_stress_adjusted_l: 40353.6, mode_share_car: 0.0699, mode_share_transit: 0.2638, mode_share_shuttle: 0.6178, mode_share_walkbike: 0.0485 },
@@ -26,76 +33,137 @@ const scenarios: Scenario[] = [
 const baseline = scenarios.find((s) => s.scenario_id === "V1+P1")!;
 const winner = scenarios.find((s) => s.scenario_id === "V3+P2")!;
 
-const constraints = [
-  "Capacity must be satisfied",
-  "Budget cannot be exceeded",
-  "Accessibility threshold must pass",
-  "Average travel threshold must pass",
-  "P95 travel threshold must pass",
-  "Venue and policy must be compatible",
+const venueLegend = [
+  "V1: McCormick Place Lakeside",
+  "V2: Navy Pier Grand Ballroom",
+  "V3: UIC Forum",
 ];
 
-const processSteps = [
-  {
-    title: "Frame The Decision",
-    copy: "Lock metro, event type, baseline, venue options, and policy bundles so optimization cannot be tuned after seeing results.",
-    output: "Frozen case definition",
-  },
-  {
-    title: "Assemble Evidence",
-    copy: "Ingest and harmonize OD travel, mode behavior, venue factors, and operations assumptions into canonical tables with provenance.",
-    output: "Traceable modeling inputs",
-  },
-  {
-    title: "Simulate All Scenarios",
-    copy: "Run every venue-policy combination through travel, emissions, cost, waste, and water models under common assumptions.",
-    output: "9 fully comparable scenarios",
-  },
-  {
-    title: "Filter And Rank",
-    copy: "Apply hard feasibility constraints first, then rank feasible scenarios by balanced multi-objective performance under uncertainty.",
-    output: "Robust winner recommendation",
-  },
+const policyLegend = [
+  "P1: Business-as-usual operations",
+  "P2: Full low-impact bundle (transit incentive, shuttle, waste/energy upgrades)",
+  "P3: Partial low-impact bundle",
 ];
 
-const evidenceRows = [
-  { tier: "DIRECT", meaning: "Primary measured or official inputs", examples: "ACS, TIGER, GTFS, Open-Meteo pulls" },
-  { tier: "PROXY", meaning: "Closest defensible approximation", examples: "Behavior priors and fallback factors" },
-  { tier: "MANUAL_PUBLIC", meaning: "Publicly documented reference", examples: "External sustainability benchmark" },
-  { tier: "ASSUMPTION", meaning: "Explicit assumption with audit note", examples: "Deterministic fallback parameters" },
+const dataSources: DataSourceRow[] = [
+  {
+    source: "ACS + TIGER",
+    coverage: "15 origin zones",
+    variables: "population, commute context, centroid geometry",
+    role: "origin demand and geography",
+  },
+  {
+    source: "GTFS (CTA feed)",
+    coverage: "Chicago transit schedule snapshot",
+    variables: "stops, trips, service windows, fare attributes",
+    role: "transit accessibility and generalized travel cost",
+  },
+  {
+    source: "OSRM routing",
+    coverage: "45 OD pairs (zones x venues)",
+    variables: "travel time, distance",
+    role: "car travel burden and routing baseline",
+  },
+  {
+    source: "Open-Meteo",
+    coverage: "event-date weather profile",
+    variables: "temperature, precipitation",
+    role: "venue energy and comfort context",
+  },
+  {
+    source: "eGRID + EPA GHG Hub + WARM",
+    coverage: "regional factor set",
+    variables: "kg CO2e/kWh, mode factors, waste factors",
+    role: "emissions accounting for travel and operations",
+  },
+  {
+    source: "WRI Aqueduct",
+    coverage: "regional stress factor",
+    variables: "water stress index",
+    role: "stress-adjusted water impact",
+  },
+  {
+    source: "Venue public documentation",
+    coverage: "3 venues",
+    variables: "capacity, accessibility score, rental cost",
+    role: "feasibility and cost constraints",
+  },
+  {
+    source: "External validation artifact",
+    coverage: "1 public benchmark",
+    variables: "waste diversion plausibility reference",
+    role: "sanity check against public sustainability outcomes",
+  },
 ];
 
 const qaChecks = [
-  "14 of 14 QA checks passed",
-  "OD pair coverage complete",
-  "Transit viability flags valid",
-  "Origin and mode shares reconcile to 1.0",
+  "14/14 QA checks passed",
+  "OD pair coverage complete (45 expected, 45 observed)",
+  "Mode probabilities reconcile to 1.0",
+  "Transit viability flags are valid",
   "Policy emission monotonicity check passed",
+];
+
+const methodSteps = [
+  {
+    title: "Case Lock",
+    detail: "Freeze event type, metro, date, venues, policy bundles, and baseline before simulation to prevent hindsight tuning.",
+  },
+  {
+    title: "Scenario Enumeration",
+    detail: "Generate all venue-policy combinations: 3 x 3 = 9 scenarios.",
+  },
+  {
+    title: "Travel + Mode Modeling",
+    detail: "Compute OD travel burden and mode shares under each scenario, then aggregate weighted attendee impacts.",
+  },
+  {
+    title: "Impact Aggregation",
+    detail: "Combine travel, venue energy, waste, water, and cost into comparable scenario-level metrics.",
+  },
+  {
+    title: "Feasibility + Ranking",
+    detail: "Filter by hard constraints first, then rank feasible scenarios on multi-objective performance and robustness.",
+  },
+];
+
+const limitations = [
+  "Single metro and single event type reduce immediate external generalization.",
+  "Attendee behavior is modeled, not observed from ticket ZIP-code traces.",
+  "Some physical operations estimates rely on proxy factors where direct meter data is unavailable.",
+  "Transit and routing conditions are snapshot-based and can vary on event day.",
+];
+
+const futureWork = [
+  "Integrate observed attendance origin data and post-event surveys for calibration.",
+  "Ingest direct venue utility and waste hauler invoices to reduce proxy usage.",
+  "Scale to additional metros, event types, and larger venue sets.",
+  "Add interactive what-if controls for organizer-facing planning workflows.",
 ];
 
 function fmtNum(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function pct(delta: number, base: number) {
-  return (delta / base) * 100;
-}
-
-function fmtSigned(n: number) {
+function signed(n: number) {
   return `${n > 0 ? "+" : ""}${fmtNum(n)}`;
 }
 
-function fmtSignedPct(n: number) {
+function signedPct(n: number) {
   return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 }
 
-function SlideHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
+function pctChange(delta: number, base: number) {
+  return (delta / base) * 100;
+}
+
+function SlideHeader({ num, title, subtitle }: { num: string; title: string; subtitle?: string }) {
   return (
-    <div className="slide-header">
-      <p className="eyebrow">{eyebrow}</p>
+    <header className="slide-header">
+      <p className="eyebrow">Slide {num}</p>
       <h2>{title}</h2>
       {subtitle ? <p className="slide-subtitle">{subtitle}</p> : null}
-    </div>
+    </header>
   );
 }
 
@@ -170,183 +238,291 @@ export default function Home() {
 
   return (
     <main className="deck-shell">
-      <nav className="deck-nav" aria-label="Section navigation">
-        <a href="#problem">Problem</a>
-        <a href="#solution">Solution</a>
-        <a href="#evidence">Evidence</a>
-        <a href="#results">Results</a>
-        <a href="#landscape">Scenarios</a>
+      <nav className="deck-nav" aria-label="Slide navigation">
+        <a href="#s1">1</a>
+        <a href="#s2">2</a>
+        <a href="#s3">3</a>
+        <a href="#s4">4</a>
+        <a href="#s5">5</a>
+        <a href="#s6">6</a>
+        <a href="#s7">7</a>
+        <a href="#s8">8</a>
+        <a href="#s9">9</a>
+        <a href="#s10">10</a>
+        <a href="#appendix">Appendix</a>
       </nav>
 
-      <section className="slide intro" id="intro">
-        <p className="eyebrow">AVDS Presentation Site</p>
-        <h1>Metro Event Siting and Operations Optimizer</h1>
-        <p className="hero-copy">
-          A judge-ready decision narrative for Chicago: from problem definition and method to evidence-backed recommendation.
-        </p>
-        <div className="headline-grid">
-          <article>
-            <small>Recommended scenario</small>
-            <h3>{winner.scenario_id}</h3>
-            <p>Robust best feasible option across objectives.</p>
-          </article>
-          <article>
-            <small>Baseline comparator</small>
-            <h3>{baseline.scenario_id}</h3>
-            <p>Reference for quantifying improvements.</p>
-          </article>
-          <article>
-            <small>Decision scope</small>
-            <h3>3 venues x 3 policies</h3>
-            <p>All 9 combinations evaluated consistently.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="slide" id="problem">
+      <section className="slide intro" id="s1">
         <SlideHeader
-          eyebrow="1. Problem"
-          title="What Problem Are We Solving?"
-          subtitle="Choose one venue-policy scenario that reduces impact without breaking operations, access, or budget."
+          num="1"
+          title="EcoPlan-OR: Metro Event Siting and Operations Optimizer"
+          subtitle="Chicago case: single-day indoor data science conference"
         />
-
-        <div className="deck-grid two">
-          <article className="deck-card problem-card">
-            <h3>Operational Reality</h3>
-            <ul>
-              <li>Venue decisions affect travel emissions, attendee burden, and operating cost simultaneously.</li>
-              <li>Single-metric optimization often creates regressions in at least one critical objective.</li>
-              <li>Judges need a transparent decision process, not just a leaderboard.</li>
-            </ul>
+        <div className="title-grid">
+          <article className="deck-card">
+            <h3>Team</h3>
+            <p>AVDS</p>
+            <p className="muted">Advanced Venue Decision System</p>
           </article>
-
-          <article className="deck-card constraint-card" id="solution">
-            <h3>How We Fix It</h3>
-            <p>
-              AVDS runs all scenarios through the same pipeline, enforces hard constraints before ranking,
-              then selects the most robust feasible winner.
-            </p>
-            <div className="pill-grid">
-              {constraints.map((item) => (
-                <span className="pill" key={item}>{item}</span>
-              ))}
+          <article className="deck-card">
+            <h3>Decision Context</h3>
+            <p>Baseline: {baseline.scenario_id}</p>
+            <p>Recommended: {winner.scenario_id}</p>
+            <p>Scope: 3 venues x 3 policies</p>
+          </article>
+          <article className="deck-card">
+            <h3>Submission Links</h3>
+            <div className="link-stack">
+              <a href="https://dashboard-app-beta-seven.vercel.app" target="_blank" rel="noopener noreferrer">Live Dashboard (Vercel)</a>
+              <a href="https://github.com/desenyon/avds-dashboard-app" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
             </div>
           </article>
         </div>
       </section>
 
-      <section className="slide">
+      <section className="slide" id="s2">
         <SlideHeader
-          eyebrow="2. Process"
-          title="How The Decision Was Built"
-          subtitle="From case framing to robust recommendation in four auditable steps."
+          num="2"
+          title="The Problem"
+          subtitle="Event sustainability decisions are often made too late, after venue lock-in creates avoidable impact."
         />
+        <div className="deck-grid two">
+          <article className="deck-card problem-card">
+            <h3>Why This Matters</h3>
+            <ul>
+              <li>Venue and operations decisions determine travel emissions, waste outcomes, energy demand, and water burden.</li>
+              <li>Optimizing a single metric can worsen another critical metric.</li>
+              <li>Organizers need a feasible plan, not just a low-emissions hypothetical.</li>
+            </ul>
+          </article>
+          <article className="deck-card stats-card">
+            <h3>Case Facts</h3>
+            <ul>
+              <li>Metro: Chicago, IL</li>
+              <li>Event: single-day indoor data science conference</li>
+              <li>Date: 2026-06-20</li>
+              <li>Attendance prior: 1,200 to 1,800</li>
+            </ul>
+          </article>
+        </div>
+      </section>
 
+      <section className="slide" id="s3">
+        <SlideHeader
+          num="3"
+          title="Research Question"
+          subtitle="Which venue-policy combination minimizes environmental impact while staying feasible on budget, capacity, accessibility, and travel burden?"
+        />
+        <div className="deck-grid two">
+          <article className="deck-card">
+            <h3>Formal Question</h3>
+            <p>
+              For a Chicago metro single-day indoor event, which scenario $s = (v, p)$ minimizes
+              CO2e, landfill, and stress-adjusted water while satisfying hard feasibility constraints?
+            </p>
+            <p className="muted">
+              Hypothesis: a transit-accessible venue with stronger operations policy will outperform business-as-usual baseline.
+            </p>
+          </article>
+          <article className="deck-card">
+            <h3>Scenario Legend</h3>
+            <div className="legend-group">
+              <p><b>Venue IDs</b></p>
+              <ul>
+                {venueLegend.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              <p><b>Policy IDs</b></p>
+              <ul>
+                {policyLegend.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="slide" id="s4">
+        <SlideHeader
+          num="4"
+          title="Data Sources"
+          subtitle="Public-data stack with explicit coverage and variable usage for each modeling role."
+        />
+        <article className="deck-card">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Observations/Coverage</th>
+                  <th>Important Variables</th>
+                  <th>Role In Model</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataSources.map((row) => (
+                  <tr key={row.source}>
+                    <td>{row.source}</td>
+                    <td>{row.coverage}</td>
+                    <td>{row.variables}</td>
+                    <td>{row.role}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section className="slide" id="s5">
+        <SlideHeader
+          num="5"
+          title="Data Analysis and Methods"
+          subtitle="Feasibility-first, multi-objective workflow with scenario comparability and QA gates."
+        />
         <div className="process-grid">
-          {processSteps.map((step, idx) => (
+          {methodSteps.map((step) => (
             <article className="process-card" key={step.title}>
-              <p className="step-id">Step {idx + 1}</p>
               <h3>{step.title}</h3>
-              <p>{step.copy}</p>
-              <b>{step.output}</b>
+              <p>{step.detail}</p>
             </article>
           ))}
         </div>
+        <article className="deck-card equation-card">
+          <h3>Optimization Framing</h3>
+          <p>Minimize objective vector across feasible scenarios:</p>
+          <code>min_s f(s) = [CO2e(s), Cost(s), AvgTravel(s), Landfill(s), WaterStressAdj(s)]</code>
+          <p className="muted">subject to feasibility constraints: capacity, budget, ADA, avg travel, P95 travel, and venue-policy compatibility.</p>
+        </article>
       </section>
 
-      <section className="slide" id="evidence">
+      <section className="slide" id="s6">
         <SlideHeader
-          eyebrow="3. Evidence and QA"
-          title="Why Judges Can Trust This"
-          subtitle="Each claim is tied to source tiering, reproducible artifacts, and quality gates."
+          num="6"
+          title="Key Findings"
+          subtitle="V3+P2 is the strongest robust feasible option among 9 evaluated scenarios."
         />
+        <div className="result-grid three-up">
+          <article className="result-card">
+            <small>Winner</small>
+            <h3>{winner.scenario_id}</h3>
+            <p>Selected by robust feasible ranking</p>
+          </article>
+          <article className="result-card">
+            <small>Feasible scenarios</small>
+            <h3>9 / 9</h3>
+            <p>All candidates passed hard constraints in this case lock</p>
+          </article>
+          <article className="result-card">
+            <small>QA status</small>
+            <h3>14 / 14</h3>
+            <p>All QA gates passed</p>
+          </article>
+        </div>
+        <article className="deck-card">
+          <ul className="qa-list">
+            {qaChecks.map((check) => <li key={check}>{check}</li>)}
+          </ul>
+        </article>
+      </section>
 
+      <section className="slide" id="s7">
+        <SlideHeader
+          num="7"
+          title="Proposed Solution"
+          subtitle="Deploy the optimizer workflow for pre-event planning and select V3+P2 for this locked case."
+        />
         <div className="deck-grid two">
           <article className="deck-card">
-            <h3>Evidence Tiers</h3>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tier</th>
-                    <th>Meaning</th>
-                    <th>Examples In This Case</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {evidenceRows.map((row) => (
-                    <tr key={row.tier}>
-                      <td>{row.tier}</td>
-                      <td>{row.meaning}</td>
-                      <td>{row.examples}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article className="deck-card">
-            <h3>Validation Signals</h3>
-            <ul className="qa-list">
-              {qaChecks.map((check) => (
-                <li key={check}>{check}</li>
-              ))}
-            </ul>
-            <p className="support-note">
-              External plausibility reference included: McCormick Place sustainability documentation.
+            <h3>Recommended Plan</h3>
+            <p>
+              Choose <b>{winner.scenario_id}</b> for this event: it balances environmental gains, travel burden,
+              and budget while maintaining feasibility.
             </p>
+            <p className="muted">Organizer workflow: lock case inputs, run pipeline, inspect dashboard, publish decision memo.</p>
+          </article>
+          <article className="deck-card">
+            <h3>Implementation Steps</h3>
+            <ol className="ordered">
+              <li>Freeze event assumptions and constraints.</li>
+              <li>Run AVDS pipeline and QA checks.</li>
+              <li>Review scenario frontier and robustness output.</li>
+              <li>Select top feasible plan and communicate rationale.</li>
+            </ol>
           </article>
         </div>
       </section>
 
-      <section className="slide" id="results">
+      <section className="slide" id="s8">
         <SlideHeader
-          eyebrow="4. Results"
-          title="Outcome: V3+P2 Beats Baseline Across Core Metrics"
-          subtitle="Baseline is V1+P1. Negative deltas indicate improvement."
+          num="8"
+          title="Impact"
+          subtitle="Baseline V1+P1 to recommended V3+P2 (absolute and relative improvements)."
         />
-
         <div className="result-grid">
           <article className="result-card">
             <small>Total CO2e</small>
-            <h3>{fmtSigned(co2Delta)} kg</h3>
-            <p>{fmtSignedPct(pct(co2Delta, baseline.co2e_total_kg))} vs baseline</p>
+            <h3>{signed(co2Delta)} kg</h3>
+            <p>{signedPct(pctChange(co2Delta, baseline.co2e_total_kg))}</p>
           </article>
           <article className="result-card">
             <small>Total Cost</small>
-            <h3>{fmtSigned(costDelta)} USD</h3>
-            <p>{fmtSignedPct(pct(costDelta, baseline.cost_total_usd))} vs baseline</p>
+            <h3>{signed(costDelta)} USD</h3>
+            <p>{signedPct(pctChange(costDelta, baseline.cost_total_usd))}</p>
           </article>
           <article className="result-card">
-            <small>Average Travel Time</small>
-            <h3>{fmtSigned(travelDelta)} min</h3>
-            <p>{fmtSignedPct(pct(travelDelta, baseline.avg_travel_time_min))} vs baseline</p>
+            <small>Avg Travel Time</small>
+            <h3>{signed(travelDelta)} min</h3>
+            <p>{signedPct(pctChange(travelDelta, baseline.avg_travel_time_min))}</p>
           </article>
           <article className="result-card">
             <small>Landfill</small>
-            <h3>{fmtSigned(landfillDelta)} kg</h3>
-            <p>{fmtSignedPct(pct(landfillDelta, baseline.landfill_kg))} vs baseline</p>
+            <h3>{signed(landfillDelta)} kg</h3>
+            <p>{signedPct(pctChange(landfillDelta, baseline.landfill_kg))}</p>
           </article>
           <article className="result-card">
-            <small>Water Stress Adjusted Use</small>
-            <h3>{fmtSigned(waterDelta)} L</h3>
-            <p>{fmtSignedPct(pct(waterDelta, baseline.water_stress_adjusted_l))} vs baseline</p>
+            <small>Water Stress Adjusted</small>
+            <h3>{signed(waterDelta)} L</h3>
+            <p>{signedPct(pctChange(waterDelta, baseline.water_stress_adjusted_l))}</p>
           </article>
           <article className="result-card emphasis">
-            <small>Final Recommendation</small>
-            <h3>{winner.scenario_id}</h3>
-            <p>Feasible, lower-impact, and robust under uncertainty.</p>
+            <small>Bottom Line</small>
+            <h3>Lower impact, lower cost</h3>
+            <p>Recommended plan improves all five headline metrics vs baseline.</p>
           </article>
         </div>
       </section>
 
-      <section className="slide" id="landscape">
+      <section className="slide" id="s9">
         <SlideHeader
-          eyebrow="5. Scenario Landscape"
-          title="How The Winner Compares Against Every Alternative"
+          num="9"
+          title="Limitations"
+          subtitle="Current constraints and modeling assumptions that affect transferability."
         />
+        <article className="deck-card">
+          <ul className="qa-list">
+            {limitations.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </article>
+      </section>
 
+      <section className="slide" id="s10">
+        <SlideHeader
+          num="10"
+          title="Future Work"
+          subtitle="Path to increase realism, scale, and deployment readiness."
+        />
+        <article className="deck-card">
+          <ul className="qa-list">
+            {futureWork.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </article>
+      </section>
+
+      <section className="slide" id="appendix">
+        <SlideHeader
+          num="Appendix"
+          title="Scenario Landscape and Comparison Table"
+          subtitle="Reference visuals for judges who want the complete frontier."
+        />
         <div className="deck-grid two">
           <MetricBars
             title="Total CO2e by Scenario"
@@ -368,16 +544,8 @@ export default function Home() {
           />
           <ModeStack />
         </div>
-      </section>
 
-      <section className="slide">
-        <SlideHeader
-          eyebrow="6. Full Comparison"
-          title="Scenario Metrics Table"
-          subtitle="Sorted by total CO2e to show the environmental frontier quickly."
-        />
-
-        <article className="deck-card">
+        <article className="deck-card" style={{ marginTop: 12 }}>
           <div className="table-wrap">
             <table>
               <thead>
@@ -411,7 +579,7 @@ export default function Home() {
       </section>
 
       <footer className="footer-note">
-        AVDS deployable presentation dashboard. Structured for judges: problem, method, evidence, decision, and outcomes.
+        AVDS rubric-aligned presentation site. Includes problem framing, methods, solution, impact, and reproducibility links.
       </footer>
     </main>
   );

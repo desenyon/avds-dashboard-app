@@ -39,7 +39,7 @@ body {
   z-index: 20;
   display: flex;
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   margin-bottom: 14px;
   padding: 9px 12px;
@@ -47,6 +47,7 @@ body {
   background: var(--nav-bg);
   backdrop-filter: blur(5px);
   box-shadow: 0 12px 36px rgba(12, 31, 43, 0.2);
+  overflow-x: auto;
 }
 
 .deck-nav a {
@@ -99,28 +100,21 @@ h1 {
   font-size: clamp(2rem, 4vw, 3.35rem);
 }
 
-.hero-copy {
-  margin: 0;
-  max-width: 70ch;
-  color: #395766;
-  font-size: 1rem;
-}
-
-.headline-grid {
+.title-grid {
   margin-top: 16px;
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.headline-grid article {
+.title-grid article {
   border: 1px solid rgba(28, 77, 106, 0.18);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.76);
   padding: 12px;
 }
 
-.headline-grid small {
+.title-grid small {
   display: block;
   color: #4b6c80;
   font-size: 0.76rem;
@@ -128,16 +122,41 @@ h1 {
   text-transform: uppercase;
 }
 
-.headline-grid h3 {
+.title-grid h3 {
   margin: 5px 0 3px;
   font-family: var(--font-sora), sans-serif;
   font-size: 1.28rem;
 }
 
-.headline-grid p {
+.title-grid p {
   margin: 0;
   font-size: 0.86rem;
   color: #426073;
+}
+
+.link-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.link-stack a {
+  border: 1px solid rgba(27, 75, 102, 0.24);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: #1c5779;
+  font-weight: 600;
+  font-size: 0.84rem;
+  background: rgba(240, 248, 252, 0.85);
+}
+
+.link-stack a:hover {
+  border-color: rgba(27, 75, 102, 0.48);
+  background: rgba(230, 244, 251, 0.96);
+}
+
+.muted {
+  color: #4e6f83;
 }
 
 .slide-header {
@@ -178,6 +197,16 @@ h1 {
   font-family: var(--font-sora), sans-serif;
 }
 
+.deck-card p {
+  margin: 0;
+  color: #2f5164;
+  font-size: 0.9rem;
+}
+
+.deck-card p + p {
+  margin-top: 5px;
+}
+
 .problem-card ul,
 .qa-list {
   margin: 0;
@@ -191,6 +220,30 @@ h1 {
 .constraint-card p {
   margin: 0;
   color: #304e62;
+}
+
+.stats-card ul,
+.legend-group ul,
+.ordered {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #2d4d5f;
+  font-size: 0.9rem;
+}
+
+.legend-group p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.legend-group p + ul {
+  margin-top: 4px;
+}
+
+.legend-group ul + p {
+  margin-top: 10px;
 }
 
 .pill-grid {
@@ -212,7 +265,7 @@ h1 {
 .process-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .process-card {
@@ -232,14 +285,30 @@ h1 {
 }
 
 .process-card h3 {
-  margin: 6px 0 6px;
-  font-size: 1rem;
+  margin: 0 0 6px;
+  font-size: 0.96rem;
 }
 
 .process-card p {
   margin: 0;
   color: #39586b;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
+}
+
+.equation-card {
+  margin-top: 12px;
+}
+
+.equation-card code {
+  display: block;
+  border-radius: 10px;
+  background: rgba(18, 62, 88, 0.08);
+  color: #1b3f56;
+  border: 1px solid rgba(18, 62, 88, 0.14);
+  padding: 10px;
+  font-size: 0.82rem;
+  margin: 8px 0;
+  white-space: pre-wrap;
 }
 
 .process-card b {
@@ -283,6 +352,10 @@ th {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.result-grid.three-up {
+  margin-bottom: 10px;
 }
 
 .result-card {
@@ -409,7 +482,7 @@ tr.winner {
 }
 
 @media (max-width: 1050px) {
-  .headline-grid,
+  .title-grid,
   .process-grid,
   .result-grid,
   .deck-grid.two {
@@ -426,7 +499,7 @@ tr.winner {
     padding: 18px;
   }
 
-  .headline-grid,
+  .title-grid,
   .process-grid,
   .result-grid,
   .deck-grid.two {
