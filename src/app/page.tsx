@@ -26,45 +26,50 @@ const scenarios: Scenario[] = [
 const baseline = scenarios.find((s) => s.scenario_id === "V1+P1")!;
 const winner = scenarios.find((s) => s.scenario_id === "V3+P2")!;
 
-const problemStatement =
-  "For a large Chicago event, organizers must choose one venue and one policy bundle that cut environmental impact without increasing attendee burden or violating hard operational limits.";
+const constraints = [
+  "Capacity must be satisfied",
+  "Budget cannot be exceeded",
+  "Accessibility threshold must pass",
+  "Average travel threshold must pass",
+  "P95 travel threshold must pass",
+  "Venue and policy must be compatible",
+];
 
 const processSteps = [
   {
-    title: "Define The Decision Space",
-    detail:
-      "Lock case assumptions first: metro, event type, baseline, venues, policies, and data sources. This prevents hindsight tuning.",
+    title: "Frame The Decision",
+    copy: "Lock metro, event type, baseline, venue options, and policy bundles so optimization cannot be tuned after seeing results.",
+    output: "Frozen case definition",
   },
   {
-    title: "Build Comparable Scenario Inputs",
-    detail:
-      "Generate OD accessibility, mode probabilities, venue energy, waste, water, and cost inputs with source provenance and QA checks.",
+    title: "Assemble Evidence",
+    copy: "Ingest and harmonize OD travel, mode behavior, venue factors, and operations assumptions into canonical tables with provenance.",
+    output: "Traceable modeling inputs",
   },
   {
-    title: "Apply Constraints Before Ranking",
-    detail:
-      "Drop scenarios that fail capacity, budget, ADA/accessibility, or travel thresholds so only feasible options remain.",
+    title: "Simulate All Scenarios",
+    copy: "Run every venue-policy combination through travel, emissions, cost, waste, and water models under common assumptions.",
+    output: "9 fully comparable scenarios",
   },
   {
-    title: "Choose Robust Winner",
-    detail:
-      "From feasible scenarios, select the option with strongest emissions-cost-travel tradeoff and stable rank under uncertainty.",
+    title: "Filter And Rank",
+    copy: "Apply hard feasibility constraints first, then rank feasible scenarios by balanced multi-objective performance under uncertainty.",
+    output: "Robust winner recommendation",
   },
 ];
 
-const hardConstraints = [
-  "Capacity",
-  "Budget",
-  "Accessibility threshold",
-  "Average travel threshold",
-  "P95 travel threshold",
-  "Venue-policy compatibility",
+const evidenceRows = [
+  { tier: "DIRECT", meaning: "Primary measured or official inputs", examples: "ACS, TIGER, GTFS, Open-Meteo pulls" },
+  { tier: "PROXY", meaning: "Closest defensible approximation", examples: "Behavior priors and fallback factors" },
+  { tier: "MANUAL_PUBLIC", meaning: "Publicly documented reference", examples: "External sustainability benchmark" },
+  { tier: "ASSUMPTION", meaning: "Explicit assumption with audit note", examples: "Deterministic fallback parameters" },
 ];
 
-const qaConfidence = [
-  "14/14 QA checks passed",
+const qaChecks = [
+  "14 of 14 QA checks passed",
   "OD pair coverage complete",
-  "Mode probabilities sum to 1",
+  "Transit viability flags valid",
+  "Origin and mode shares reconcile to 1.0",
   "Policy emission monotonicity check passed",
 ];
 
@@ -72,30 +77,25 @@ function fmtNum(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function fmtPct(n: number) {
+function pct(delta: number, base: number) {
+  return (delta / base) * 100;
+}
+
+function fmtSigned(n: number) {
+  return `${n > 0 ? "+" : ""}${fmtNum(n)}`;
+}
+
+function fmtSignedPct(n: number) {
   return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 }
 
-function deltaPct(current: number, base: number) {
-  return ((current - base) / base) * 100;
-}
-
-function DeltaCard({ label, value, unit }: { label: string; value: number; unit: string }) {
-  const good = value < 0;
+function SlideHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
   return (
-    <article className="delta-card">
-      <p>{label}</p>
-      <h3 className={good ? "good" : "bad"}>{`${value >= 0 ? "+" : ""}${fmtNum(value)} ${unit}`}</h3>
-    </article>
-  );
-}
-
-function StoryCard({ title, text }: { title: string; text: string }) {
-  return (
-    <article className="story-card">
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </article>
+    <div className="slide-header">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2>{title}</h2>
+      {subtitle ? <p className="slide-subtitle">{subtitle}</p> : null}
+    </div>
   );
 }
 
@@ -114,17 +114,16 @@ function MetricBars({
   const max = Math.max(...values);
 
   return (
-    <section className="panel">
-      <h2>{title}</h2>
+    <section className="deck-card chart-card">
+      <h3>{title}</h3>
       <div className="bars">
         {scenarios.map((s) => {
           const val = Number(s[field]);
-          const width = `${(val / max) * 100}%`;
           return (
             <div className="bar-row" key={`${title}-${s.scenario_id}`}>
               <span>{s.scenario_id}</span>
               <div className="bar-track">
-                <div className="bar-fill" style={{ width, background: color }} />
+                <div className="bar-fill" style={{ width: `${(val / max) * 100}%`, background: color }} />
               </div>
               <strong>{formatter(val)}</strong>
             </div>
@@ -137,26 +136,26 @@ function MetricBars({
 
 function ModeStack() {
   return (
-    <section className="panel">
-      <h2>Mode Share Composition</h2>
+    <section className="deck-card chart-card">
+      <h3>Mode Share Composition</h3>
       <div className="bars">
         {scenarios.map((s) => (
           <div className="mode-row" key={`mode-${s.scenario_id}`}>
             <span>{s.scenario_id}</span>
             <div className="stack">
-              <div style={{ width: `${s.mode_share_car * 100}%`, background: "#c75434" }} />
-              <div style={{ width: `${s.mode_share_transit * 100}%`, background: "#1d7f68" }} />
-              <div style={{ width: `${s.mode_share_shuttle * 100}%`, background: "#0f5a92" }} />
-              <div style={{ width: `${s.mode_share_walkbike * 100}%`, background: "#e3b44c" }} />
+              <div style={{ width: `${s.mode_share_car * 100}%`, background: "#a43f2a" }} />
+              <div style={{ width: `${s.mode_share_transit * 100}%`, background: "#1e7a63" }} />
+              <div style={{ width: `${s.mode_share_shuttle * 100}%`, background: "#1f4f7f" }} />
+              <div style={{ width: `${s.mode_share_walkbike * 100}%`, background: "#d8a53d" }} />
             </div>
           </div>
         ))}
       </div>
       <div className="legend">
-        <span><i style={{ background: "#c75434" }} /> Car</span>
-        <span><i style={{ background: "#1d7f68" }} /> Transit</span>
-        <span><i style={{ background: "#0f5a92" }} /> Shuttle</span>
-        <span><i style={{ background: "#e3b44c" }} /> Walk/Bike</span>
+        <span><i style={{ background: "#a43f2a" }} />Car</span>
+        <span><i style={{ background: "#1e7a63" }} />Transit</span>
+        <span><i style={{ background: "#1f4f7f" }} />Shuttle</span>
+        <span><i style={{ background: "#d8a53d" }} />Walk/Bike</span>
       </div>
     </section>
   );
@@ -167,138 +166,252 @@ export default function Home() {
   const costDelta = winner.cost_total_usd - baseline.cost_total_usd;
   const travelDelta = winner.avg_travel_time_min - baseline.avg_travel_time_min;
   const landfillDelta = winner.landfill_kg - baseline.landfill_kg;
+  const waterDelta = winner.water_stress_adjusted_l - baseline.water_stress_adjusted_l;
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">AVDS Judge Dashboard</p>
+    <main className="deck-shell">
+      <nav className="deck-nav" aria-label="Section navigation">
+        <a href="#problem">Problem</a>
+        <a href="#solution">Solution</a>
+        <a href="#evidence">Evidence</a>
+        <a href="#results">Results</a>
+        <a href="#landscape">Scenarios</a>
+      </nav>
+
+      <section className="slide intro" id="intro">
+        <p className="eyebrow">AVDS Presentation Site</p>
         <h1>Metro Event Siting and Operations Optimizer</h1>
-        <p className="subtitle">{problemStatement}</p>
-        <div className="story-grid">
-          <StoryCard
-            title="The Problem"
-            text="Event siting usually optimizes one metric at a time. That leads to hidden tradeoffs between emissions, cost, and attendee access."
-          />
-          <StoryCard
-            title="How We Fix It"
-            text="AVDS scores every venue-policy combination under the same assumptions, enforces hard constraints, then selects the most robust feasible option."
-          />
-          <StoryCard
-            title="Decision"
-            text={`Recommended plan: ${winner.scenario_id}. Baseline comparison uses ${baseline.scenario_id} to quantify improvement.`}
-          />
-        </div>
-        <div className="hero-kpis">
-          <div><small>Recommended Plan</small><b>{winner.scenario_id}</b></div>
-          <div><small>QA Gates Passed</small><b>14/14</b></div>
-          <div><small>Feasible Scenarios</small><b>9</b></div>
-          <div><small>Scope</small><b>3 venues x 3 policies</b></div>
-        </div>
-      </section>
-
-      <section className="panel narrative">
-        <h2>1) Problem Definition and Constraints</h2>
-        <p className="intro-text">
-          Objective: choose one scenario that lowers total impact while staying feasible for operations and attendee mobility.
-          Every candidate must satisfy all constraints below before it can be ranked.
+        <p className="hero-copy">
+          A judge-ready decision narrative for Chicago: from problem definition and method to evidence-backed recommendation.
         </p>
-        <div className="pill-grid">
-          {hardConstraints.map((item) => (
-            <span key={item} className="pill">{item}</span>
-          ))}
+        <div className="headline-grid">
+          <article>
+            <small>Recommended scenario</small>
+            <h3>{winner.scenario_id}</h3>
+            <p>Robust best feasible option across objectives.</p>
+          </article>
+          <article>
+            <small>Baseline comparator</small>
+            <h3>{baseline.scenario_id}</h3>
+            <p>Reference for quantifying improvements.</p>
+          </article>
+          <article>
+            <small>Decision scope</small>
+            <h3>3 venues x 3 policies</h3>
+            <p>All 9 combinations evaluated consistently.</p>
+          </article>
         </div>
       </section>
 
-      <section className="panel narrative">
-        <h2>2) Process Used to Solve It</h2>
+      <section className="slide" id="problem">
+        <SlideHeader
+          eyebrow="1. Problem"
+          title="What Problem Are We Solving?"
+          subtitle="Choose one venue-policy scenario that reduces impact without breaking operations, access, or budget."
+        />
+
+        <div className="deck-grid two">
+          <article className="deck-card problem-card">
+            <h3>Operational Reality</h3>
+            <ul>
+              <li>Venue decisions affect travel emissions, attendee burden, and operating cost simultaneously.</li>
+              <li>Single-metric optimization often creates regressions in at least one critical objective.</li>
+              <li>Judges need a transparent decision process, not just a leaderboard.</li>
+            </ul>
+          </article>
+
+          <article className="deck-card constraint-card" id="solution">
+            <h3>How We Fix It</h3>
+            <p>
+              AVDS runs all scenarios through the same pipeline, enforces hard constraints before ranking,
+              then selects the most robust feasible winner.
+            </p>
+            <div className="pill-grid">
+              {constraints.map((item) => (
+                <span className="pill" key={item}>{item}</span>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="slide">
+        <SlideHeader
+          eyebrow="2. Process"
+          title="How The Decision Was Built"
+          subtitle="From case framing to robust recommendation in four auditable steps."
+        />
+
         <div className="process-grid">
           {processSteps.map((step, idx) => (
             <article className="process-card" key={step.title}>
               <p className="step-id">Step {idx + 1}</p>
               <h3>{step.title}</h3>
-              <p>{step.detail}</p>
+              <p>{step.copy}</p>
+              <b>{step.output}</b>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="panel narrative">
-        <h2>3) Why {winner.scenario_id} Is Recommended</h2>
-        <div className="decision-grid">
-          <article>
-            <h3>Selection Logic</h3>
-            <p>
-              {winner.scenario_id} remains feasible and delivers the strongest combined reduction in emissions,
-              travel burden, landfill, and cost relative to baseline.
-            </p>
-            <ul>
-              <li>CO2e change: {fmtNum(co2Delta)} kg ({fmtPct(deltaPct(winner.co2e_total_kg, baseline.co2e_total_kg))})</li>
-              <li>Cost change: {fmtNum(costDelta)} USD ({fmtPct(deltaPct(winner.cost_total_usd, baseline.cost_total_usd))})</li>
-              <li>Avg travel change: {fmtNum(travelDelta)} min ({fmtPct(deltaPct(winner.avg_travel_time_min, baseline.avg_travel_time_min))})</li>
-              <li>Landfill change: {fmtNum(landfillDelta)} kg ({fmtPct(deltaPct(winner.landfill_kg, baseline.landfill_kg))})</li>
-            </ul>
+      <section className="slide" id="evidence">
+        <SlideHeader
+          eyebrow="3. Evidence and QA"
+          title="Why Judges Can Trust This"
+          subtitle="Each claim is tied to source tiering, reproducible artifacts, and quality gates."
+        />
+
+        <div className="deck-grid two">
+          <article className="deck-card">
+            <h3>Evidence Tiers</h3>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>Meaning</th>
+                    <th>Examples In This Case</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evidenceRows.map((row) => (
+                    <tr key={row.tier}>
+                      <td>{row.tier}</td>
+                      <td>{row.meaning}</td>
+                      <td>{row.examples}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </article>
-          <article>
-            <h3>Judge Confidence</h3>
-            <p>Decision confidence comes from reproducibility, validation, and consistency checks:</p>
-            <ul>
-              {qaConfidence.map((item) => (
-                <li key={item}>{item}</li>
+
+          <article className="deck-card">
+            <h3>Validation Signals</h3>
+            <ul className="qa-list">
+              {qaChecks.map((check) => (
+                <li key={check}>{check}</li>
               ))}
             </ul>
+            <p className="support-note">
+              External plausibility reference included: McCormick Place sustainability documentation.
+            </p>
           </article>
         </div>
       </section>
 
-      <section className="grid-4">
-        <DeltaCard label="CO2e vs Baseline" value={co2Delta} unit="kg" />
-        <DeltaCard label="Cost vs Baseline" value={costDelta} unit="USD" />
-        <DeltaCard label="Avg Travel vs Baseline" value={travelDelta} unit="min" />
-        <DeltaCard label="Landfill vs Baseline" value={landfillDelta} unit="kg" />
-      </section>
+      <section className="slide" id="results">
+        <SlideHeader
+          eyebrow="4. Results"
+          title="Outcome: V3+P2 Beats Baseline Across Core Metrics"
+          subtitle="Baseline is V1+P1. Negative deltas indicate improvement."
+        />
 
-      <section className="grid-2">
-        <MetricBars title="Total CO2e by Scenario" field="co2e_total_kg" formatter={(v) => `${fmtNum(v)} kg`} color="linear-gradient(90deg, #d9793c, #c1481f)" />
-        <MetricBars title="Total Cost by Scenario" field="cost_total_usd" formatter={(v) => `$${fmtNum(v)}`} color="linear-gradient(90deg, #3e7fb2, #1f4f78)" />
-        <MetricBars title="Average Travel Time by Scenario" field="avg_travel_time_min" formatter={(v) => `${fmtNum(v)} min`} color="linear-gradient(90deg, #61a07e, #2f6d4c)" />
-        <ModeStack />
-      </section>
-
-      <section className="panel">
-        <h2>Scenario Table</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Scenario</th>
-                <th>CO2e (kg)</th>
-                <th>Cost (USD)</th>
-                <th>Avg Travel (min)</th>
-                <th>Landfill (kg)</th>
-                <th>Water Stress (L)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scenarios
-                .slice()
-                .sort((a, b) => a.co2e_total_kg - b.co2e_total_kg)
-                .map((s) => (
-                  <tr key={`row-${s.scenario_id}`} className={s.scenario_id === winner.scenario_id ? "winner" : ""}>
-                    <td>{s.scenario_id}</td>
-                    <td>{fmtNum(s.co2e_total_kg)}</td>
-                    <td>{fmtNum(s.cost_total_usd)}</td>
-                    <td>{fmtNum(s.avg_travel_time_min)}</td>
-                    <td>{fmtNum(s.landfill_kg)}</td>
-                    <td>{fmtNum(s.water_stress_adjusted_l)}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+        <div className="result-grid">
+          <article className="result-card">
+            <small>Total CO2e</small>
+            <h3>{fmtSigned(co2Delta)} kg</h3>
+            <p>{fmtSignedPct(pct(co2Delta, baseline.co2e_total_kg))} vs baseline</p>
+          </article>
+          <article className="result-card">
+            <small>Total Cost</small>
+            <h3>{fmtSigned(costDelta)} USD</h3>
+            <p>{fmtSignedPct(pct(costDelta, baseline.cost_total_usd))} vs baseline</p>
+          </article>
+          <article className="result-card">
+            <small>Average Travel Time</small>
+            <h3>{fmtSigned(travelDelta)} min</h3>
+            <p>{fmtSignedPct(pct(travelDelta, baseline.avg_travel_time_min))} vs baseline</p>
+          </article>
+          <article className="result-card">
+            <small>Landfill</small>
+            <h3>{fmtSigned(landfillDelta)} kg</h3>
+            <p>{fmtSignedPct(pct(landfillDelta, baseline.landfill_kg))} vs baseline</p>
+          </article>
+          <article className="result-card">
+            <small>Water Stress Adjusted Use</small>
+            <h3>{fmtSigned(waterDelta)} L</h3>
+            <p>{fmtSignedPct(pct(waterDelta, baseline.water_stress_adjusted_l))} vs baseline</p>
+          </article>
+          <article className="result-card emphasis">
+            <small>Final Recommendation</small>
+            <h3>{winner.scenario_id}</h3>
+            <p>Feasible, lower-impact, and robust under uncertainty.</p>
+          </article>
         </div>
+      </section>
+
+      <section className="slide" id="landscape">
+        <SlideHeader
+          eyebrow="5. Scenario Landscape"
+          title="How The Winner Compares Against Every Alternative"
+        />
+
+        <div className="deck-grid two">
+          <MetricBars
+            title="Total CO2e by Scenario"
+            field="co2e_total_kg"
+            formatter={(v) => `${fmtNum(v)} kg`}
+            color="linear-gradient(90deg, #de7b3f, #be3e1f)"
+          />
+          <MetricBars
+            title="Total Cost by Scenario"
+            field="cost_total_usd"
+            formatter={(v) => `$${fmtNum(v)}`}
+            color="linear-gradient(90deg, #4b8bb6, #245777)"
+          />
+          <MetricBars
+            title="Average Travel Time by Scenario"
+            field="avg_travel_time_min"
+            formatter={(v) => `${fmtNum(v)} min`}
+            color="linear-gradient(90deg, #64a083, #3a6f53)"
+          />
+          <ModeStack />
+        </div>
+      </section>
+
+      <section className="slide">
+        <SlideHeader
+          eyebrow="6. Full Comparison"
+          title="Scenario Metrics Table"
+          subtitle="Sorted by total CO2e to show the environmental frontier quickly."
+        />
+
+        <article className="deck-card">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>CO2e (kg)</th>
+                  <th>Cost (USD)</th>
+                  <th>Avg Travel (min)</th>
+                  <th>Landfill (kg)</th>
+                  <th>Water Stress (L)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarios
+                  .slice()
+                  .sort((a, b) => a.co2e_total_kg - b.co2e_total_kg)
+                  .map((s) => (
+                    <tr key={`row-${s.scenario_id}`} className={s.scenario_id === winner.scenario_id ? "winner" : ""}>
+                      <td>{s.scenario_id}</td>
+                      <td>{fmtNum(s.co2e_total_kg)}</td>
+                      <td>{fmtNum(s.cost_total_usd)}</td>
+                      <td>{fmtNum(s.avg_travel_time_min)}</td>
+                      <td>{fmtNum(s.landfill_kg)}</td>
+                      <td>{fmtNum(s.water_stress_adjusted_l)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
       <footer className="footer-note">
-        Built with Next.js for presentation and deployment. Data from the AVDS optimization pipeline and QA-validated artifacts.
+        AVDS deployable presentation dashboard. Structured for judges: problem, method, evidence, decision, and outcomes.
       </footer>
     </main>
   );
