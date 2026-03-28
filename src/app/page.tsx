@@ -26,8 +26,58 @@ const scenarios: Scenario[] = [
 const baseline = scenarios.find((s) => s.scenario_id === "V1+P1")!;
 const winner = scenarios.find((s) => s.scenario_id === "V3+P2")!;
 
+const problemStatement =
+  "For a large Chicago event, organizers must choose one venue and one policy bundle that cut environmental impact without increasing attendee burden or violating hard operational limits.";
+
+const processSteps = [
+  {
+    title: "Define The Decision Space",
+    detail:
+      "Lock case assumptions first: metro, event type, baseline, venues, policies, and data sources. This prevents hindsight tuning.",
+  },
+  {
+    title: "Build Comparable Scenario Inputs",
+    detail:
+      "Generate OD accessibility, mode probabilities, venue energy, waste, water, and cost inputs with source provenance and QA checks.",
+  },
+  {
+    title: "Apply Constraints Before Ranking",
+    detail:
+      "Drop scenarios that fail capacity, budget, ADA/accessibility, or travel thresholds so only feasible options remain.",
+  },
+  {
+    title: "Choose Robust Winner",
+    detail:
+      "From feasible scenarios, select the option with strongest emissions-cost-travel tradeoff and stable rank under uncertainty.",
+  },
+];
+
+const hardConstraints = [
+  "Capacity",
+  "Budget",
+  "Accessibility threshold",
+  "Average travel threshold",
+  "P95 travel threshold",
+  "Venue-policy compatibility",
+];
+
+const qaConfidence = [
+  "14/14 QA checks passed",
+  "OD pair coverage complete",
+  "Mode probabilities sum to 1",
+  "Policy emission monotonicity check passed",
+];
+
 function fmtNum(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function fmtPct(n: number) {
+  return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
+
+function deltaPct(current: number, base: number) {
+  return ((current - base) / base) * 100;
 }
 
 function DeltaCard({ label, value, unit }: { label: string; value: number; unit: string }) {
@@ -36,6 +86,15 @@ function DeltaCard({ label, value, unit }: { label: string; value: number; unit:
     <article className="delta-card">
       <p>{label}</p>
       <h3 className={good ? "good" : "bad"}>{`${value >= 0 ? "+" : ""}${fmtNum(value)} ${unit}`}</h3>
+    </article>
+  );
+}
+
+function StoryCard({ title, text }: { title: string; text: string }) {
+  return (
+    <article className="story-card">
+      <h3>{title}</h3>
+      <p>{text}</p>
     </article>
   );
 }
@@ -104,12 +163,31 @@ function ModeStack() {
 }
 
 export default function Home() {
+  const co2Delta = winner.co2e_total_kg - baseline.co2e_total_kg;
+  const costDelta = winner.cost_total_usd - baseline.cost_total_usd;
+  const travelDelta = winner.avg_travel_time_min - baseline.avg_travel_time_min;
+  const landfillDelta = winner.landfill_kg - baseline.landfill_kg;
+
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">AVDS Presentation Dashboard</p>
+        <p className="eyebrow">AVDS Judge Dashboard</p>
         <h1>Metro Event Siting and Operations Optimizer</h1>
-        <p className="subtitle">Deployable Next.js app | Chicago case | baseline <strong>{baseline.scenario_id}</strong> vs recommended <strong>{winner.scenario_id}</strong></p>
+        <p className="subtitle">{problemStatement}</p>
+        <div className="story-grid">
+          <StoryCard
+            title="The Problem"
+            text="Event siting usually optimizes one metric at a time. That leads to hidden tradeoffs between emissions, cost, and attendee access."
+          />
+          <StoryCard
+            title="How We Fix It"
+            text="AVDS scores every venue-policy combination under the same assumptions, enforces hard constraints, then selects the most robust feasible option."
+          />
+          <StoryCard
+            title="Decision"
+            text={`Recommended plan: ${winner.scenario_id}. Baseline comparison uses ${baseline.scenario_id} to quantify improvement.`}
+          />
+        </div>
         <div className="hero-kpis">
           <div><small>Recommended Plan</small><b>{winner.scenario_id}</b></div>
           <div><small>QA Gates Passed</small><b>14/14</b></div>
@@ -118,11 +196,65 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="panel narrative">
+        <h2>1) Problem Definition and Constraints</h2>
+        <p className="intro-text">
+          Objective: choose one scenario that lowers total impact while staying feasible for operations and attendee mobility.
+          Every candidate must satisfy all constraints below before it can be ranked.
+        </p>
+        <div className="pill-grid">
+          {hardConstraints.map((item) => (
+            <span key={item} className="pill">{item}</span>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel narrative">
+        <h2>2) Process Used to Solve It</h2>
+        <div className="process-grid">
+          {processSteps.map((step, idx) => (
+            <article className="process-card" key={step.title}>
+              <p className="step-id">Step {idx + 1}</p>
+              <h3>{step.title}</h3>
+              <p>{step.detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel narrative">
+        <h2>3) Why {winner.scenario_id} Is Recommended</h2>
+        <div className="decision-grid">
+          <article>
+            <h3>Selection Logic</h3>
+            <p>
+              {winner.scenario_id} remains feasible and delivers the strongest combined reduction in emissions,
+              travel burden, landfill, and cost relative to baseline.
+            </p>
+            <ul>
+              <li>CO2e change: {fmtNum(co2Delta)} kg ({fmtPct(deltaPct(winner.co2e_total_kg, baseline.co2e_total_kg))})</li>
+              <li>Cost change: {fmtNum(costDelta)} USD ({fmtPct(deltaPct(winner.cost_total_usd, baseline.cost_total_usd))})</li>
+              <li>Avg travel change: {fmtNum(travelDelta)} min ({fmtPct(deltaPct(winner.avg_travel_time_min, baseline.avg_travel_time_min))})</li>
+              <li>Landfill change: {fmtNum(landfillDelta)} kg ({fmtPct(deltaPct(winner.landfill_kg, baseline.landfill_kg))})</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Judge Confidence</h3>
+            <p>Decision confidence comes from reproducibility, validation, and consistency checks:</p>
+            <ul>
+              {qaConfidence.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        </div>
+      </section>
+
       <section className="grid-4">
-        <DeltaCard label="CO2e vs Baseline" value={winner.co2e_total_kg - baseline.co2e_total_kg} unit="kg" />
-        <DeltaCard label="Cost vs Baseline" value={winner.cost_total_usd - baseline.cost_total_usd} unit="USD" />
-        <DeltaCard label="Avg Travel vs Baseline" value={winner.avg_travel_time_min - baseline.avg_travel_time_min} unit="min" />
-        <DeltaCard label="Landfill vs Baseline" value={winner.landfill_kg - baseline.landfill_kg} unit="kg" />
+        <DeltaCard label="CO2e vs Baseline" value={co2Delta} unit="kg" />
+        <DeltaCard label="Cost vs Baseline" value={costDelta} unit="USD" />
+        <DeltaCard label="Avg Travel vs Baseline" value={travelDelta} unit="min" />
+        <DeltaCard label="Landfill vs Baseline" value={landfillDelta} unit="kg" />
       </section>
 
       <section className="grid-2">
