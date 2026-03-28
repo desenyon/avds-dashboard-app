@@ -561,6 +561,7 @@ export default function Home() {
             <div className="link-stack">
               <a href="https://dashboard-app-beta-seven.vercel.app" target="_blank" rel="noopener noreferrer">Live Dashboard (Vercel)</a>
               <a href="https://github.com/desenyon/avds-dashboard-app" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+              <a href="https://drive.google.com/drive/u/0/folders/1vxJd7hspLyiX8mDB6_H5G2ioATSgSjyp" target="_blank" rel="noopener noreferrer">Submission Link</a>
             </div>
           </article>
         </div>
