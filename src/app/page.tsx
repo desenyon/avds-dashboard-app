@@ -273,17 +273,20 @@ function ParetoScatter() {
   const maxCo2 = Math.max(...scenarios.map((s) => s.co2e_total_kg));
   const minTravel = Math.min(...scenarios.map((s) => s.avg_travel_time_min));
   const maxTravel = Math.max(...scenarios.map((s) => s.avg_travel_time_min));
+  const co2Span = maxCo2 - minCo2 || 1;
+  const costSpan = maxCost - minCost || 1;
 
   return (
     <article className="deck-card">
-      <h3>Pareto View: Cost vs CO2e</h3>
-      <p className="muted">Point size encodes average travel time. Lower-left is better.</p>
-      <div className="scatter-wrap" aria-label="Cost versus CO2e scatter">
+      <h3>Pareto view: CO2e vs cost</h3>
+      <p className="muted">
+        Axes match the interactive dashboard: x = total CO2e (kg), y = total cost (USD). Point size encodes average travel time. Lower-left is better.
+      </p>
+      <div className="scatter-wrap" aria-label="CO2e versus cost scatter">
         {scenarios.map((s) => {
-          const x = ((s.cost_total_usd - minCost) / (maxCost - minCost)) * 100;
-          const yRaw = ((s.co2e_total_kg - minCo2) / (maxCo2 - minCo2)) * 100;
-          const y = 100 - yRaw;
-          const r = 8 + ((s.avg_travel_time_min - minTravel) / (maxTravel - minTravel)) * 8;
+          const x = ((s.co2e_total_kg - minCo2) / co2Span) * 100;
+          const y = ((s.cost_total_usd - minCost) / costSpan) * 100;
+          const r = 8 + ((s.avg_travel_time_min - minTravel) / (maxTravel - minTravel || 1)) * 8;
           const winnerClass = s.scenario_id === winner.scenario_id ? " winner-dot" : "";
 
           return (
@@ -291,7 +294,7 @@ function ParetoScatter() {
               key={`dot-${s.scenario_id}`}
               className={`scatter-dot${winnerClass}`}
               style={{ left: `${x}%`, bottom: `${y}%`, width: `${r * 2}px`, height: `${r * 2}px` }}
-              title={`${s.scenario_id} | Cost ${fmtNum(s.cost_total_usd)} | CO2e ${fmtNum(s.co2e_total_kg)} | Travel ${fmtNum(s.avg_travel_time_min)}`}
+              title={`${s.scenario_id} | CO2e ${fmtNum(s.co2e_total_kg)} kg | Cost ${fmtNum(s.cost_total_usd)} USD | Travel ${fmtNum(s.avg_travel_time_min)} min`}
             >
               <span>{s.scenario_id}</span>
             </div>
@@ -299,9 +302,10 @@ function ParetoScatter() {
         })}
       </div>
       <div className="axis-caption">
-        <span>Lower cost</span>
-        <span>Higher cost</span>
+        <span>Lower CO2e</span>
+        <span>Higher CO2e</span>
       </div>
+      <p className="scatter-y-note">Vertical position: total cost (USD); bottom = lower cost.</p>
     </article>
   );
 }

@@ -357,6 +357,12 @@ th {
   color: #4b6c80;
 }
 
+.scatter-y-note {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: #5a7890;
+}
+
 .compare-grid {
   display: grid;
   gap: 9px;
